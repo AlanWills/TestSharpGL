@@ -18,7 +18,8 @@ namespace TestSharpGL
     {
         List<Triangle> triangles = new List<Triangle>();
 
-        Vector3 cameraPosition;
+        Vector3 lightPosition;
+        float rotation = 0;
         OpenGL gl;
         uint theProgram, vertexAttributeObject, vertexBufferObject;
         string strVertexShader = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "Light.vert");
@@ -29,12 +30,12 @@ namespace TestSharpGL
             InitializeComponent();
 
             MouseWheel += MainWindow_MouseWheel;
-            cameraPosition = new Vector3(0, 0, -6.0f);
+            lightPosition = new Vector3(0, 0, -1);
         }
 
         private void MainWindow_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            cameraPosition.Z += 0.1f * e.Delta;
+            //cameraPosition.Z += 0.1f * e.Delta;
         }
 
         private void OpenGLControl_OpenGLInitialized(object sender, OpenGLEventArgs args)
@@ -70,12 +71,12 @@ namespace TestSharpGL
 
         private void OpenGLControl_OpenGLDraw(object sender, OpenGLEventArgs args)
         {
+            rotation += 0.01f;
+
 #if false
             //Clear the color and depth buffers.
             gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
             gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-
-            gl.UseProgram(theProgram);
 
             gl.DrawText(5, 100, 1, 1, 1, "Courier New", 12, "Hello");
 
@@ -96,23 +97,76 @@ namespace TestSharpGL
             
             gl.End();
 
-            gl.UseProgram(0);
-
             // Flush OpenGL.
             gl.Flush();
 
 #else
-            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT);
+            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
 
             // Reset the modelview matrix.
             gl.LoadIdentity();
 
             gl.UseProgram(theProgram);
 
-            gl.BindVertexArray(vertexAttributeObject);
-            gl.DrawArrays(OpenGL.GL_TRIANGLES, 0, 3);
+            //glm::mat4 view;
+            //view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+            //// Projection 
+            //glm::mat4 projection;
+            //projection = glm::perspective(fov, (GLfloat)WIDTH / (GLfloat)HEIGHT, 0.1f, 100.0f);
+            //// Get the uniform locations
+            //GLint modelLoc = glGetUniformLocation(ourShader.Program, "model");
+            //GLint viewLoc = glGetUniformLocation(ourShader.Program, "view");
+            //GLint projLoc = glGetUniformLocation(ourShader.Program, "projection");
+            //// Pass the matrices to the shader
+            //glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+            //glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
+            int projLoc = gl.GetUniformLocation(theProgram, "projection");
+            int viewLoc = gl.GetUniformLocation(theProgram, "view");
+            int modelLoc = gl.GetUniformLocation(theProgram, "model");
+            int lightPosLoc = gl.GetUniformLocation(theProgram, "lightPos");
+            gl.Uniform3(lightPosLoc, (float)lightPosition.X, (float)lightPosition.Y, (float)lightPosition.Z);
+
+            float[] projectionMat = new float[16]
+            {
+                -(float)gl.RenderContextProvider.Height / gl.RenderContextProvider.Width, 0, 0, 0,
+                0, (float)(1 / Math.Tan(45.0f)), 0, 0,
+                0, 0, (100.0f/99.99f), 0,
+                0, 0, -(10/99.99f), 1
+            };
+
+            float[] viewMat = new float[16]
+            {
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1,
+            };
+
+            //float[] viewMat = new float[16]
+            //{
+            //    1, 0, 0, 0,
+            //    0, (float)Math.Cos(rotation), -(float)Math.Sin(rotation), 0,
+            //    0, (float)Math.Sin(rotation), (float)Math.Cos(rotation), 0,
+            //    0, 0, 0, 1,
+            //};
+
+            float[] modelMat = new float[16]
+            {
+                (float)Math.Cos(rotation), 0, -(float)Math.Sin(rotation), 0,
+                0, 1, 0, 0,
+                (float)Math.Sin(rotation), 0, (float)Math.Cos(rotation), 0,
+                0, 0, 0, 1,
+            };
+
+            gl.UniformMatrix4(projLoc, 1, false, projectionMat);
+            gl.UniformMatrix4(viewLoc, 1, false, viewMat);
+            gl.UniformMatrix4(modelLoc, 1, false, modelMat);
+
+            gl.BindVertexArray(vertexAttributeObject);
+            gl.DrawArrays(OpenGL.GL_TRIANGLES, 0, 36);
             gl.BindVertexArray(0);
+
             gl.UseProgram(0);
 
             gl.Flush();
@@ -184,59 +238,50 @@ namespace TestSharpGL
 
         private void InitializeVertexBuffer()
         {
-            //float[] vertexPositions = {
-            //    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-            //     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-            //     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-            //     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-            //    -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-            //    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-
-            //    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-            //     0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-            //     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-            //     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-            //    -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-            //    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-
-            //    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-            //    -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-            //    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-            //    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-            //    -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-            //    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-
-            //     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-            //     0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-            //     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-            //     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-            //     0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-            //     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-
-            //    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-            //     0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-            //     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-            //     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-            //    -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-            //    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-
-            //    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-            //     0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-            //     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-            //     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-            //    -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-            //    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
-            //};
-
             float[] vertexPositions = {
-                -0.5f, -0.5f, -0.5f,
-                 0.5f, -0.5f, -0.5f,
-                 0.5f,  0.5f, -0.5f,
-                 0.5f,  0.5f, -0.5f,
-                -0.5f,  0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
-            };
+                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
 
+                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
+
+                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+
+                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+
+                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+
+                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
+            };
+            
             uint[] vao = new uint[1];
             gl.GenVertexArrays(1, vao);
             vertexAttributeObject = vao[0];
@@ -255,16 +300,21 @@ namespace TestSharpGL
             gl.BindVertexArray(vertexAttributeObject);
 
             // Position attribute
-            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
+            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 9 * sizeof(float), IntPtr.Zero);
             gl.EnableVertexAttribArray(0);
 
-            //IntPtr offset = new IntPtr(3 * sizeof(float));
+            // Normal attribute
+            IntPtr offset = new IntPtr(3 * sizeof(float));
+            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 9 * sizeof(float), offset);
+            gl.EnableVertexAttribArray(1);
 
-            //// Normal attribute
-            //gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 6 * sizeof(float), offset);
-            //gl.EnableVertexAttribArray(1);
+            // Color attribute
+            offset = new IntPtr(6 * sizeof(float));
+            gl.VertexAttribPointer(2, 3, OpenGL.GL_FLOAT, false, 9 * sizeof(float), offset);
+            gl.EnableVertexAttribArray(2);
+
+
             gl.BindVertexArray(0);
-
             handle.Free();
         }
         
