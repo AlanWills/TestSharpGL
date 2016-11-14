@@ -35,7 +35,7 @@ namespace TestSharpGL
             MouseRightButtonDown += MainWindow_MouseRightButtonDown;
             MouseMove += MainWindow_MouseMove;
             MouseRightButtonUp += MainWindow_MouseRightButtonUp;
-            lightPosition = new Vector3(0, 0, 10);
+            lightPosition = new Vector3(0, 0, 5);
             cameraPosition = new Vector3(0, 0, -5);
         }
 
