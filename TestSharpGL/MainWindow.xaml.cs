@@ -35,8 +35,8 @@ namespace TestSharpGL
             MouseRightButtonDown += MainWindow_MouseRightButtonDown;
             MouseMove += MainWindow_MouseMove;
             MouseRightButtonUp += MainWindow_MouseRightButtonUp;
-            lightPosition = new Vector3(0, 0, -1);
-            cameraPosition = new Vector3(0, 0, 0);
+            lightPosition = new Vector3(0, 0, 10);
+            cameraPosition = new Vector3(0, 0, -5);
         }
 
         private void MainWindow_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -179,29 +179,22 @@ namespace TestSharpGL
             gl.Uniform3(lightPosLoc, lightPosition.X, lightPosition.Y, lightPosition.Z);
 
             Matrix4x4 projectionMat = Matrix4x4.CreatePerspectiveFieldOfView(0.5f * (float)(Math.PI), (float)gl.RenderContextProvider.Width / gl.RenderContextProvider.Height, 0.1f, 100);
-            projectionMat = Matrix4x4.Identity;
+            //projectionMat = Matrix4x4.Identity;
             float[] projectionFloats = projectionMat.ToFloatArray();
 
-            // Orthographic
-            float[] projectionFloats2 = new float[16]
-            {
-                0.1f / 400f, 0, 0, 0,
-                0, 0.1f / 400f, 0, 0,
-                0, 0, -100.01f / 99.99f, -20f / 99.99f,
-                0, 0, -1, 0,
-            };
-
-            Matrix4x4 viewMat = Matrix4x4.CreateRotationY(cameraRotation);
+            Matrix4x4 viewMat = Matrix4x4.CreateTranslation(cameraPosition);
             //viewMat = Matrix4x4.Identity;
             float[] viewFloats = viewMat.ToFloatArray();
             
-            Matrix4x4 modelMat = Matrix4x4.CreateRotationY(modelRotation);
+            Matrix4x4 modelMat = Matrix4x4.CreateRotationY(cameraRotation);
             //modelMat = Matrix4x4.Identity;
             float[] modelFloats = modelMat.ToFloatArray();
 
-            gl.UniformMatrix4(projLoc, 1, true, projectionFloats);
-            gl.UniformMatrix4(viewLoc, 1, true, viewFloats);
-            gl.UniformMatrix4(modelLoc, 1, true, modelFloats);
+            Matrix4x4 test = Matrix4x4.Multiply(modelMat, projectionMat);
+
+            gl.UniformMatrix4(projLoc, 1, false, projectionFloats);
+            gl.UniformMatrix4(viewLoc, 1, false, viewFloats);
+            gl.UniformMatrix4(modelLoc, 1, false, modelFloats);
 
             gl.BindVertexArray(vertexAttributeObject);
             gl.DrawArrays(OpenGL.GL_TRIANGLES, 0, numberOfTriangles * 3);
