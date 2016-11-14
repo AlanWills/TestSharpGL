@@ -42,3 +42,5 @@ C:\Users\alan\Documents\Visual Studio 2015\TestSharpGL\TestSharpGL\obj\Debug\Mai
 C:\Users\alan\Documents\Visual Studio 2015\TestSharpGL\TestSharpGL\obj\Debug\TestSharpGL.g.resources
 C:\Users\alan\Documents\Visual Studio 2015\TestSharpGL\TestSharpGL\obj\Debug\TestSharpGL.Properties.Resources.resources
 C:\Users\alan\Documents\Visual Studio 2015\TestSharpGL\TestSharpGL\obj\Debug\TestSharpGL.csproj.GenerateResource.Cache
+C:\Users\alan\Documents\Visual Studio 2015\TestSharpGL\TestSharpGL\bin\Debug\System.Numerics.Vectors.dll
+C:\Users\alan\Documents\Visual Studio 2015\TestSharpGL\TestSharpGL\bin\Debug\System.Numerics.Vectors.xml

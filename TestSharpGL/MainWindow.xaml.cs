@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -16,9 +17,10 @@ namespace TestSharpGL
     /// </summary>
     public partial class MainWindow : Window
     {
-        List<Triangle> triangles = new List<Triangle>();
-
-        Vector3 lightPosition;
+        bool rotating = false;
+        Point mousePosDown;
+        Vector3 lightPosition, cameraPosition;
+        int numberOfTriangles;
         float rotation = 0;
         OpenGL gl;
         uint theProgram, vertexAttributeObject, vertexBufferObject;
@@ -30,12 +32,35 @@ namespace TestSharpGL
             InitializeComponent();
 
             MouseWheel += MainWindow_MouseWheel;
+            MouseRightButtonDown += MainWindow_MouseRightButtonDown;
+            MouseMove += MainWindow_MouseMove;
+            MouseRightButtonUp += MainWindow_MouseRightButtonUp;
             lightPosition = new Vector3(0, 0, -1);
+            cameraPosition = new Vector3(0, 0, 0);
         }
 
         private void MainWindow_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            //cameraPosition.Z += 0.1f * e.Delta;
+            cameraPosition.Z += 1 * Math.Sign(e.Delta);
+        }
+
+        private void MainWindow_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            rotating = true;
+            mousePosDown = e.MouseDevice.GetPosition(this);
+        }
+        private void MainWindow_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (rotating)
+            {
+                rotation += (float)(e.MouseDevice.GetPosition(this).X - mousePosDown.X) * 0.001f;
+                mousePosDown = e.MouseDevice.GetPosition(this);
+            }
+        }
+
+        private void MainWindow_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            rotating = false;
         }
 
         private void OpenGLControl_OpenGLInitialized(object sender, OpenGLEventArgs args)
@@ -44,8 +69,7 @@ namespace TestSharpGL
             gl = args.OpenGL;
             gl.Enable(OpenGL.GL_DEPTH_TEST);
 
-            InitializeVertexBuffer();
-            InitializeProgram();
+            float[] data;
 
             using (FileStream model = new FileStream(@"C:\Users\alan\Downloads\Helix_pentagon.STL", FileMode.Open))
             {
@@ -54,123 +78,94 @@ namespace TestSharpGL
                 byte[] numTrianglesInBytes = new byte[4];
                 model.Read(numTrianglesInBytes, 0, 4);
 
-                int number = BitConverter.ToInt32(numTrianglesInBytes, 0);
-
-                triangles = new List<Triangle>(number);
+                numberOfTriangles = BitConverter.ToInt32(numTrianglesInBytes, 0);
+                data = new float[3 * 6 * numberOfTriangles];
 
                 byte[] pointData = new byte[50];
 
-                for (int i = 0; i < number; i++)
+                for (int i = 0; i < numberOfTriangles; ++i)
                 {
                     model.Read(pointData, 0, 50);
-                    
-                    triangles.Add(new Triangle(pointData));
+
+                    // Normal
+                    float x, y, z, nx, ny, nz;
+                    nx = BitConverter.ToSingle(pointData, 0);
+                    ny = BitConverter.ToSingle(pointData, 4);
+                    nz = BitConverter.ToSingle(pointData, 8);
+
+                    for (int point = 1; point < 4; ++point)
+                    {
+                        x = BitConverter.ToSingle(pointData, point * 12);
+                        y = BitConverter.ToSingle(pointData, point * 12 + 4);
+                        z = BitConverter.ToSingle(pointData, point * 12 + 8);
+
+                        data[3 * i + 6 * (point - 1)] = x;
+                        data[3 * i + 6 * (point - 1) + 1] = y;
+                        data[3 * i + 6 * (point - 1) + 2] = z;
+                        data[3 * i + 6 * (point - 1) + 3] = nx;
+                        data[3 * i + 6 * (point - 1) + 4] = ny;
+                        data[3 * i + 6 * (point - 1) + 5] = nz;
+                    }
                 }
             }
+
+            float[] vertexPositions = {
+                -0.5f, 0, -0.5f, 0.0f, 0.0f, -1.0f,
+                 0.5f, 0, -0.5f, 0.0f, 0.0f, -1.0f,
+                 0, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
+            };
+
+            InitializeVertexBuffer(vertexPositions);
+            InitializeProgram();
         }
 
         private void OpenGLControl_OpenGLDraw(object sender, OpenGLEventArgs args)
         {
-            rotation += 0.01f;
-
-#if false
-            //Clear the color and depth buffers.
-            gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-
-            gl.DrawText(5, 100, 1, 1, 1, "Courier New", 12, "Hello");
-
-            // Reset the modelview matrix.
-            gl.LoadIdentity();
-
-            // Move the geometry into a fairly central position.
-            gl.Translate(-90, -80, -100);
-
-            // Start drawing triangles.
-            gl.Begin(OpenGL.GL_TRIANGLES);
-
-            gl.Color(1.0f, 1.0f, 1.0f);
-            foreach (Triangle triangle in triangles)
-            {
-                triangle.Draw(gl);
-            }
-            
-            gl.End();
-
-            // Flush OpenGL.
-            gl.Flush();
-
-#else
             gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
 
             // Reset the modelview matrix.
             gl.LoadIdentity();
 
             gl.UseProgram(theProgram);
-
-            //glm::mat4 view;
-            //view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-            //// Projection 
-            //glm::mat4 projection;
-            //projection = glm::perspective(fov, (GLfloat)WIDTH / (GLfloat)HEIGHT, 0.1f, 100.0f);
-            //// Get the uniform locations
-            //GLint modelLoc = glGetUniformLocation(ourShader.Program, "model");
-            //GLint viewLoc = glGetUniformLocation(ourShader.Program, "view");
-            //GLint projLoc = glGetUniformLocation(ourShader.Program, "projection");
-            //// Pass the matrices to the shader
-            //glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-            //glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
+            
             int projLoc = gl.GetUniformLocation(theProgram, "projection");
             int viewLoc = gl.GetUniformLocation(theProgram, "view");
             int modelLoc = gl.GetUniformLocation(theProgram, "model");
             int lightPosLoc = gl.GetUniformLocation(theProgram, "lightPos");
-            gl.Uniform3(lightPosLoc, (float)lightPosition.X, (float)lightPosition.Y, (float)lightPosition.Z);
+            gl.Uniform3(lightPosLoc, lightPosition.X, lightPosition.Y, lightPosition.Z);
 
-            float[] projectionMat = new float[16]
+            Matrix4x4 projectionMat = Matrix4x4.CreatePerspectiveFieldOfView(0.5f * (float)(Math.PI), (float)gl.RenderContextProvider.Width / gl.RenderContextProvider.Height, 0.1f, 100);
+            //projectionMat = Matrix4x4.Identity;
+            float[] projectionFloats = projectionMat.ToFloatArray();
+
+            // Orthographic
+            float[] projectionFloats2 = new float[16]
             {
-                -(float)gl.RenderContextProvider.Height / gl.RenderContextProvider.Width, 0, 0, 0,
-                0, (float)(1 / Math.Tan(45.0f)), 0, 0,
-                0, 0, (100.0f/99.99f), 0,
-                0, 0, -(10/99.99f), 1
+                0.1f / 400f, 0, 0, 0,
+                0, 0.1f / 400f, 0, 0,
+                0, 0, -100.01f / 99.99f, -20f / 99.99f,
+                0, 0, -1, 0,
             };
 
-            float[] viewMat = new float[16]
-            {
-                1, 0, 0, 0,
-                0, 1, 0, 0,
-                0, 0, 1, 0,
-                0, 0, 0, 1,
-            };
+            Matrix4x4 viewMat = Matrix4x4.CreateTranslation(cameraPosition);
+            viewMat = Matrix4x4.Identity;
+            float[] viewFloats = viewMat.ToFloatArray();
+            
+            Matrix4x4 modelMat = Matrix4x4.CreateTranslation(new Vector3(-90, -80, -25));
+            modelMat = Matrix4x4.Identity;
+            float[] modelFloats = modelMat.ToFloatArray();
 
-            //float[] viewMat = new float[16]
-            //{
-            //    1, 0, 0, 0,
-            //    0, (float)Math.Cos(rotation), -(float)Math.Sin(rotation), 0,
-            //    0, (float)Math.Sin(rotation), (float)Math.Cos(rotation), 0,
-            //    0, 0, 0, 1,
-            //};
-
-            float[] modelMat = new float[16]
-            {
-                (float)Math.Cos(rotation), 0, -(float)Math.Sin(rotation), 0,
-                0, 1, 0, 0,
-                (float)Math.Sin(rotation), 0, (float)Math.Cos(rotation), 0,
-                0, 0, 0, 1,
-            };
-
-            gl.UniformMatrix4(projLoc, 1, false, projectionMat);
-            gl.UniformMatrix4(viewLoc, 1, false, viewMat);
-            gl.UniformMatrix4(modelLoc, 1, false, modelMat);
+            gl.UniformMatrix4(projLoc, 1, true, projectionFloats);
+            gl.UniformMatrix4(viewLoc, 1, true, viewFloats);
+            gl.UniformMatrix4(modelLoc, 1, true, modelFloats);
 
             gl.BindVertexArray(vertexAttributeObject);
-            gl.DrawArrays(OpenGL.GL_TRIANGLES, 0, 36);
+            gl.DrawArrays(OpenGL.GL_TRIANGLES, 0, numberOfTriangles * 3);
             gl.BindVertexArray(0);
 
             gl.UseProgram(0);
 
             gl.Flush();
-#endif
         }
 
         private void OpenGLControl_Resized(object sender, OpenGLEventArgs args)
@@ -236,52 +231,8 @@ namespace TestSharpGL
             }
         }
 
-        private void InitializeVertexBuffer()
+        private void InitializeVertexBuffer(float[] vertexPositions)
         {
-            float[] vertexPositions = {
-                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 0.5f, 0.5f, 0.5f,
-
-                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f, 0.5f, 0.5f, 0.5f,
-
-                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-
-                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-
-                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-
-                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f, 0.5f, 0.5f, 0.5f,
-            };
-            
             uint[] vao = new uint[1];
             gl.GenVertexArrays(1, vao);
             vertexAttributeObject = vao[0];
@@ -300,19 +251,18 @@ namespace TestSharpGL
             gl.BindVertexArray(vertexAttributeObject);
 
             // Position attribute
-            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 9 * sizeof(float), IntPtr.Zero);
+            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 6 * sizeof(float), IntPtr.Zero);
             gl.EnableVertexAttribArray(0);
 
             // Normal attribute
             IntPtr offset = new IntPtr(3 * sizeof(float));
-            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 9 * sizeof(float), offset);
+            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 6 * sizeof(float), offset);
             gl.EnableVertexAttribArray(1);
 
             // Color attribute
-            offset = new IntPtr(6 * sizeof(float));
-            gl.VertexAttribPointer(2, 3, OpenGL.GL_FLOAT, false, 9 * sizeof(float), offset);
-            gl.EnableVertexAttribArray(2);
-
+            //offset = new IntPtr(6 * sizeof(float));
+            //gl.VertexAttribPointer(2, 3, OpenGL.GL_FLOAT, false, 9 * sizeof(float), offset);
+            //gl.EnableVertexAttribArray(2);
 
             gl.BindVertexArray(0);
             handle.Free();
@@ -347,6 +297,33 @@ namespace TestSharpGL
             }
 
             return true;
+        }
+    }
+
+    public static class Extensions
+    {
+        public static float[] ToFloatArray(this Matrix4x4 matrix)
+        {
+            float[] floats = new float[16];
+
+            floats[0] = matrix.M11;
+            floats[1] = matrix.M12;
+            floats[2] = matrix.M13;
+            floats[3] = matrix.M14;
+            floats[4] = matrix.M21;
+            floats[5] = matrix.M22;
+            floats[6] = matrix.M23;
+            floats[7] = matrix.M24;
+            floats[8] = matrix.M31;
+            floats[9] = matrix.M32;
+            floats[10] = matrix.M33;
+            floats[11] = matrix.M34;
+            floats[12] = matrix.M41;
+            floats[13] = matrix.M42;
+            floats[14] = matrix.M43;
+            floats[15] = matrix.M44;
+
+            return floats;
         }
     }
 }

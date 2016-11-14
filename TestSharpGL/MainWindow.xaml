@@ -12,6 +12,7 @@
             OpenGLDraw="OpenGLControl_OpenGLDraw"
             OpenGLInitialized="OpenGLControl_OpenGLInitialized"
             Resized="OpenGLControl_Resized"
-            RenderContextType="FBO"/>
+            RenderContextType="FBO"
+            Width="800" Height="800" HorizontalAlignment="Center" VerticalAlignment="Center"/>
     </Grid>
 </Window>
