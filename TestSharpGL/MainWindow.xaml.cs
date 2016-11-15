@@ -19,9 +19,9 @@ namespace TestSharpGL
     {
         bool rotating = false;
         Point mousePosDown;
-        Vector3 lightPosition, cameraPosition;
+        Vector3 cameraPosition;
         int numberOfTriangles;
-        float cameraRotation = 0, modelRotation = 0;
+        float cameraRotation = 0, modelRotation = 0, fov = 45.0f;
         OpenGL gl;
         uint theProgram, vertexAttributeObject, vertexBufferObject;
         string strVertexShader = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "Light.vert");
@@ -35,13 +35,17 @@ namespace TestSharpGL
             MouseRightButtonDown += MainWindow_MouseRightButtonDown;
             MouseMove += MainWindow_MouseMove;
             MouseRightButtonUp += MainWindow_MouseRightButtonUp;
-            lightPosition = new Vector3(0, 0, 5);
             cameraPosition = new Vector3(0, 0, -5);
         }
 
         private void MainWindow_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            cameraPosition.Z += 1 * Math.Sign(e.Delta);
+            fov -= e.Delta * 0.01f;
+
+            if (fov < 5)
+            {
+                fov = 5;
+            }
         }
 
         private void MainWindow_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -68,6 +72,7 @@ namespace TestSharpGL
             //  Enable the OpenGL depth testing functionality.
             gl = args.OpenGL;
             gl.Enable(OpenGL.GL_DEPTH_TEST);
+            gl.Enable(OpenGL.GL_CULL_FACE);
 
             float[] vertexPositions;
 
@@ -176,16 +181,18 @@ namespace TestSharpGL
             int viewLoc = gl.GetUniformLocation(theProgram, "view");
             int modelLoc = gl.GetUniformLocation(theProgram, "model");
             int lightPosLoc = gl.GetUniformLocation(theProgram, "lightPos");
-            gl.Uniform3(lightPosLoc, lightPosition.X, lightPosition.Y, lightPosition.Z);
 
-            Matrix4x4 projectionMat = Matrix4x4.CreatePerspectiveFieldOfView(0.5f * (float)(Math.PI), (float)gl.RenderContextProvider.Width / gl.RenderContextProvider.Height, 0.1f, 100);
+            Matrix4x4 projectionMat = Matrix4x4.CreatePerspectiveFieldOfView(fov * (float)(Math.PI) / 180f, (float)gl.RenderContextProvider.Width / gl.RenderContextProvider.Height, 0.1f, 100);
             //projectionMat = Matrix4x4.Identity;
             float[] projectionFloats = projectionMat.ToFloatArray();
+
+            Vector3 pos = Vector3.Transform(cameraPosition, projectionMat);
+            gl.Uniform3(lightPosLoc, pos.X, pos.Y, pos.Z);
 
             Matrix4x4 viewMat = Matrix4x4.CreateTranslation(cameraPosition);
             //viewMat = Matrix4x4.Identity;
             float[] viewFloats = viewMat.ToFloatArray();
-            
+
             Matrix4x4 modelMat = Matrix4x4.CreateRotationY(cameraRotation);
             //modelMat = Matrix4x4.Identity;
             float[] modelFloats = modelMat.ToFloatArray();
